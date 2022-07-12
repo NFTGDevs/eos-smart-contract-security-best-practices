@@ -1,77 +1,88 @@
-# EOS 智能合约最佳安全开发指南
+#  EOS Smart Contract Development Security Best Practices
 
-English Version: [check here](/README_EN.md)\
+中文版请见: [此处](/README.md)\
 한국어 버전: [여기를 클릭](/README_KR.md)
 
-这篇文档旨在为 EOS 智能合约开发人员提供一些智能合约的**安全准则**及**已知漏洞分析**。我们邀请社区对该文档提出修改或完善建议，欢迎各种合并请求(Pull Request)。若有相关的文章或博客的发表，也请将其加入到[参考文献](#参考文献)中。
+English version translated by: [Kai Jing(from EOS42)](https://t.me/shuke0327)
 
-## 目录
+This document aims to provide some **security guidelines** for developers of EOS smart contracts and list analysis of some **known contract vulnerabilities**. We invite the community to suggest for modifications or improvements of this document and welcome various kinds of pull requests.  You are also welcomed to add relevant articles or blogs published, please add them to [reference](#Reference).
 
-* [安全准则](#安全准则)
-* [已知漏洞](#已知漏洞)
-   * [数值溢出](#数值溢出)
-      * [漏洞示例](#漏洞示例)
-      * [防御方法](#防御方法)
-      * [真实案例](#真实案例)
-   * [权限校验](#权限校验)
-      * [漏洞示例](#漏洞示例-1)
-      * [防御方法](#防御方法-1)
-      * [真实案例](#真实案例-1)
-   * [apply 校验](#apply-校验)
-      * [漏洞示例](#漏洞示例-2)
-      * [防御方法](#防御方法-2)
-      * [真实案例](#真实案例-2)
-   * [transfer 假通知](#transfer-假通知)
-      * [漏洞示例](#漏洞示例-3)
-      * [防御方法](#防御方法-3)
-      * [真实案例](#真实案例-3)
-   * [随机数实践](#随机数实践)
-      * [漏洞示例](#漏洞示例-4)
-      * [防御方法](#防御方法-4)
-      * [真实案例](#真实案例-4)
-   * [回滚攻击](#回滚攻击)
-      * [漏洞示例](#漏洞示例-5)
-      * [防御方法](#防御方法-5)
-      * [真实案例](#真实案例-5)
-* [参考文献](#参考文献)
-* [致谢](#致谢)
 
-## 安全准则
+## Directories
 
-EOS 处于早期阶段并且有很强的实验性质。因此，随着新的 bug 和安全漏洞被发现，新的功能不断被开发出来，其面临的安全威胁也是不断变化的。这篇文章对于开发人员编写安全的智能合约来说只是个开始。
+* [Security Guidelines](#security-guidelines)
+* [Known Vulnerabilities](#known-vulnerabilities)
+   * [Numerical Overflow](#numerical-overflow)
+      * [Vulnerability Sample](#vulnerability-sample)
+      * [Defense Method](#defense-method)
+      * [The Real Case](#the-real-case)
+   * [Authorization Check](#authorization-check)
+      * [Vulnerability Sample](#vulnerability-sample-1)
+      * [Defense Method](#defense-method-1)
+      * [The Real Case](#the-real-case-1)
+   * [Apply Check](#apply-check)
+      * [Vulnerability Sample](#vulnerability-sample-2)
+      * [Defense Method](#defense-method-2)
+      * [The Real Case](#the-real-case-2)
+   * [Transfer Error Prompt](#transfer-error-prompt)
+      * [Vulnerability Sample](#vulnerability-sample-3)
+      * [Defense Method](#defense-method-3)
+      * [The Real Case](#the-real-case-3)
+   * [Random Number Practice](#random-number-practice)
+      * [Vulnerability Sample](#vulnerability-sample-4)
+      * [Defense Method](#defense-method-4)
+      * [The Real Case](#the-real-case-4)
+   * [Rollback Attack](#rollback-attack)
+      * [Vulnerability Sample](#vulnerability-sample-5)
+      * [Defense Method](#defense-method-5)
+      * [The Real Case](#the-real-case-5)
+      
 
-开发智能合约需要一个全新的工程思维，它不同于我们以往项目的开发。因为它犯错的代价是巨大的，很难像中心化类型的软件那样，打上补丁就可以弥补损失。就像直接给硬件编程或金融服务类软件开发，相比于 Web 开发和移动开发都有更大的挑战。因此，仅仅防范已知的漏洞是不够的，还需要学习新的开发理念：
+* [Reference](#reference)
+* [Acknowledgement](#acknowledgement)
 
-- **对可能的错误有所准备**。任何有意义的智能合约或多或少都存在错误，因此你的代码必须能够正确的处理出现的 bug 和漏洞。需始终保证以下规则：
-	- 当智能合约出现错误时，停止合约
-	- 管理账户的资金风险，如限制（转账）速率、最大（转账）额度
-	- 有效的途径来进行 bug 修复和功能提升
-- **谨慎发布智能合约**。 尽量在正式发布智能合约之前发现并修复可能的 bug。
-	- 对智能合约进行彻底的测试，并在任何新的攻击手法被发现后及时的测试（包括已经发布的合约）
-	- 从 alpha 版本在麒麟测试网(CryptoKylin-Testnet)上发布开始便邀请专业安全审计机构进行审计，并提供漏洞赏金计划(Bug Bounty)
-	- 阶段性发布，每个阶段都提供足够的测试
-- **保持智能合约的简洁**。复杂会增加出错的风险。
-	- 确保智能合约逻辑简洁
-	- 确保合约和函数模块化
-	- 使用已经被广泛使用的合约或工具（比如，不要自己写一个随机数生成器）
-	- 条件允许的话，清晰明了比性能更重要
-	- 只在你系统的去中心化部分使用区块链
-- **保持更新**。通过公开资源来确保获取到最新的安全进展。
-	- 在任何新的漏洞被发现时检查你的智能合约
-	- 尽可能快的将使用到的库或者工具更新到最新
-	- 使用最新的安全技术
-- **清楚区块链的特性**。尽管你先前所拥有的编程经验同样适用于智能合约开发，但这里仍然有些陷阱你需要留意：
-	- `require_recipient(account_name name)` 可触发通知，如果账户`name`下有合约，会调用`name`合约中的同名函数，[官方文档](https://developers.eos.io/eosio-cpp/v1.2.0/reference#section-require_recipient)
+## [Security Guidelines](#security-guidelines)
 
-## 已知漏洞
+EOS is still in its early stages and has some experimental characteristics. As a result, as new bugs and security vulnerabilities are discovered and new features are developed, the security threats we face are constantly changing. This article is just the start for developers  to create secure smart contracts.
 
-### 数值溢出
+Developing smart contracts requires a new kind of engineering mindset, which is different from the development of our previous projects. Because the cost of making mistakes are so high, it's so hard to make up for it by patching,  as centralized software does. As with hardware programming or software development for financial services, there are greater challenges to face than Web development or mobile development. Therefore, it is not enough to guard against the known vulnerabilities, but to learn new development concepts:
 
-在进行算术运算时，未进行边界检查可能导致数值上下溢，引起智能合约用户资产受损。
+- **Be prepared for possible mistakes**. Any meaningful smart contract is more or less wrong, so your code must be able to properly handle the bugs and vulnerabilities that arise. 
+Always follow these rules:
+- stop the smart contract when an error occurs
+- manage the risk of the account, such as limit (transfer) rate and set maximum (transfer) limit
+- figure out effective ways to fix bugs and improve functionality
 
-#### 漏洞示例
+- **Be prudent of releasing smart contracts**.Try  your best to find out and fix the potential bugs before the smart contract is officially released.
+   - Test smart contracts thoroughly and  retest them in time after any new attacks are discovered (testing those contracts that have been issued as well)
+   - Invite professional security audit firms for audition and provide Bug Bounty Program from the start of the alpha release on the cryptokylin-testnet, Jungle-testnet, or other public test nets.
+  - Release in several phases, at each phrase, ensure adequate testings are provided.
 
-存在缺陷的代码：`batchtransfer` 批量转账
+- **Keep the smart contracts simply**。Increased complexity will increase the risk of error.
+
+  - Ensure the logic of the smart contracts are concise
+  - Ensure that contracts and functions are modular
+  - Use contracts or tools that are already widely adapted(For example, don't write a random number generator yourself)
+  - Clarity is more important than performance when allows
+  - Use blockchain tech only for the decentralized part of your system
+
+- **Keep updated**. Ensure access to the latest security developments by disclosing resources.
+  - Check your smart contract when any new vulnerabilities are discovered
+  - Update the library or tool as quickly as possible when possible
+  - Use the latest security technologies
+
+- **Get clear understanding of blockchain features**。Although your previous programming experience is also applicable to smart contract development, there are still pitfalls to keep an eye out for：
+  - `require_recipient(account_name name)` will trigger notification，and call the function with the same name within `name` contract(if account `name` already deployed contract)，[see official doc here](https://developers.eos.io/eosio-cpp/v1.2.0/reference#section-require_recipient)
+
+## [Known Vulnerabilities](#known-vulnerabilities)
+
+### [Numerical Overflow](#numerical-overflow)
+
+When doing arithmetic operations, failing to check the boundaries may cause the values to overflow, causing loss of  users assets.
+
+#### [Vulnerability Sample](#vulnerability-sample)
+
+codes with vulnerability：`batchtransfer` batch transfer
 
 ```c++
 typedef struct acnts {
@@ -95,7 +106,7 @@ void batchtransfer(symbol_name symbol, account_name from, account_names to, uint
     eosio_assert(is_balance_within_range(balance), "invalid balance");
     eosio_assert(balance > 0, "must transfer positive balance");
 
-    uint64_t amount = balance * 4; //乘法溢出
+    uint64_t amount = balance * 4; //Multiplication overflow
 
     int itr = db_find_i64(_self, symbol, N(table), from);
     eosio_assert(itr >= 0, "Sub-- wrong name");
@@ -111,21 +122,20 @@ void batchtransfer(symbol_name symbol, account_name from, account_names to, uint
 }
 ```
 
-#### 防御方法
+#### [Defense Method](#defense-method)
+As far as possible, use the `asset` structure for operations, rather than extract `balance` for operations.
 
-尽可能使用 asset 结构体进行运算，而不是把 balance 提取出来进行运算。
+#### [The Real Case](#the-real-case)
 
-#### 真实案例
+- [【Don't play EOS Fomo3D Game】the Wolf game is under overflow attack and go die](https://bihu.com/article/995093)
 
-- [【EOS Fomo3D你千万别玩】狼人杀遭到溢出攻击, 已经凉凉](https://bihu.com/article/995093)
+### [Authorization Check](#authorization-check)
 
-### 权限校验
+When making relevant operations, please do strictly determine whether the parameters passed into the function are consistent with the actual caller , use `require_auth` for authorization check.
 
-在进行相关操作时，应严格判断函数入参和实际调用者是否一致，使用`require_auth`进行校验。
+#### [Vulnerability Sample](#vulnerability-sample-1)
 
-#### 漏洞示例
-
-存在缺陷的代码：`transfer` 转账
+codes with vulnerability：`transfer` 
 
 ```c++
 void token::transfer( account_name from,
@@ -154,21 +164,21 @@ void token::transfer( account_name from,
 }
 ```
 
-#### 防御方法
+#### [Defense Method](#defense-method-1)
 
-使用`require_auth( from )`校验资产转出账户与调用账户是否一致。
+Use `require_auth( from )` method to check whether the asset transfer account is consistent with the calling account
 
-#### 真实案例
+#### [The Real Case](#the-real-case-1)
 
-暂无
+None
 
-### apply 校验
+### [Apply Check](#apply-check)
 
-在处理合约调用时，应确保每个 action 与 code 均满足关联要求。
+When processing contract calls, ensure that each action and codes meet the associated requirements.
 
-#### 漏洞示例
+#### [Vulnerability Sample](#vulnerability-sample-2)
 
-存在缺陷的代码：
+codes with vulnerability：
 
 ```c++
 // extend from EOSIO_ABI
@@ -193,61 +203,60 @@ extern "C" { \
 EOSIO_ABI_EX(eosio::charity, (hi)(transfer))
 ```
 
-#### 防御方法
+#### [Defense Method](#defense-method-2)
 
-使用
+Use the codes below:
 
 ```
 if( ((code == self  && action != N(transfer) ) || (code == N(eosio.token) && action == N(transfer)) || action == N(onerror)) ) { }
 ```
+Bind each key action and code to meet the requirements, in order to avoid abnormal and illegal calls.
 
-绑定每个关键 action 与 code 是否满足要求，避免异常调用。
+#### [The Real Case](#the-real-case-2)
 
-#### 真实案例
+[EOSBet Transfer Hack Statement](https://medium.com/@eosbetcasino/eosbet-transfer-hack-statement-31a3be4f5dcf)
 
-- [EOSBet 黑客攻击事件复盘](https://medium.com/@eosbetcasino/eosbet-%E9%BB%91%E5%AE%A2%E6%94%BB%E5%87%BB%E4%BA%8B%E4%BB%B6%E5%A4%8D%E7%9B%98-13663d8f3f1)
+### [Transfer Error Prompt](#transfer-error-prompt)
 
-### transfer 假通知
+When processing a notification triggered by `require_recipient`, ensure that `transfer.to` is `_self`.
 
-在处理 `require_recipient` 触发的通知时，应确保 `transfer.to` 为 `_self`。
+#### [Vulnerability Sample](#vulnerability-sample-3)
 
-#### 漏洞示例
-
-存在缺陷的代码：
+codes with vulnerability：
 
 ```c++
 // source code: https://gitlab.com/EOSBetCasino/eosbetdice_public/blob/master/EOSBetDice.cpp#L115
 void transfer(uint64_t sender, uint64_t receiver) {
 
-	auto transfer_data = unpack_action_data<st_transfer>();
+  auto transfer_data = unpack_action_data<st_transfer>();
 
-	if (transfer_data.from == _self || transfer_data.from == N(eosbetcasino)){
-		return;
-	}
+  if (transfer_data.from == _self || transfer_data.from == N(eosbetcasino)){
+    return;
+  }
 
-	eosio_assert( transfer_data.quantity.is_valid(), "Invalid asset");
+  eosio_assert( transfer_data.quantity.is_valid(), "Invalid asset");
 }
 ```
 
-#### 防御方法
+#### [Defense Method](#defense-method-3)
 
-增加
+add
 
 ```
 if (transfer_data.to != _self) return;
 ```
 
-#### 真实案例
+#### [The Real Case](#the-real-case-3)
 
-- [EOS DApp 充值“假通知”漏洞分析](https://mp.weixin.qq.com/s/8hg-Ykj0RmqQ69gWbVwsyg)
+- [EOS DApp recharge "error prompt" vulnerability analysis](https://mp.weixin.qq.com/s/8hg-Ykj0RmqQ69gWbVwsyg)
 
-### 随机数实践
+### [Random Number Practice](#random-number-practice)
 
-随机数生成算法不要引入可控或者可预测的种子
+Random number generator algorithm should not introduce controllable or predictable seeds
 
-#### 漏洞示例
+#### [Vulnerability Sample](#vulnerability-sample-4)
 
-存在缺陷的代码：
+codes with vulnerability：
 
 ```c++
 // source code: https://github.com/loveblockchain/eosdice/blob/3c6f9bac570cac236302e94b62432b73f6e74c3b/eosbocai2222.hpp#L174
@@ -274,43 +283,41 @@ uint8_t random(account_name name, uint64_t game_id)
 }
 ```
 
-#### 防御方法
+#### [Defense Method](#defense-method-4)
 
-EOS链上不能生成真随机数，在设计随机类应用时建议参考官方的示例
+True random numbers cannot be generated on the EOS. It is recommended to refer to the official example when designing a random class application.
 
 - [Randomization in Contracts](https://developers.eos.io/eosio-cpp/v1.3.2/docs/random-number-generation)
 
 
-#### 真实案例
+#### [The Real Case](#the-real-case-4)
 
-- [慢雾预警：知名DApp EOSDice由于随机数问题再次被黑](http://www.chaindd.com/nictation/3140025.html)
-
-
-### 回滚攻击
-
-- 手法1：在事务中探测执行结果(如收款金额、账号余额、表记录、随机数计算结果等)，当结果满足一定条件时调用 eosio_assert ，使得当前事务失败回滚。
-- 手法2：利用超级节点黑名单账号发起事务，欺骗普通节点做出响应，但此事务不会被打包。
-
-#### 漏洞示例
-
-常见的有缺陷的模式：
-
-- 博弈类游戏下注随即开奖并转账，恶意合约可通过 inline_action 检测余额是否增加，从而回滚失败的开奖
-- 博弈类游戏下注随即将开奖结果写入表内，恶意合约可通过 inline_action 检测表中记录，从而回滚失败的开奖
-- 博弈类游戏开奖结果与游戏内奖券号相关联，恶意合约可通过同时发起多笔小额下注事务和一笔大额下注事务，当收到小额中奖时回滚事务，从而达到将可中奖的奖券号“转让”给大额下注的目的。
-- 博弈类游戏开奖事务与下注事务没有关联，攻击者可用黑名单账号或者恶意合约回滚下注事务
-
-#### 防御方法
-
-- 使用 defer action 转账和发送收据
-- 建立开奖依赖，如订单依赖，开奖的时候判断订单是否存在，就算在节点服务器上开奖成功，由于在 bp 上下注订单被回滚，所以相应的开奖记录也会被回滚。
+- [SlowMist warning: Well-known DApp EOSDice is hacked again due to random number problems](http://www.chaindd.com/nictation/3140025.html)
 
 
-#### 真实案例
+### [Rollback Attack](#rollback-attack)
 
-- [EOS 回滚攻击手法分析之黑名单篇](https://mp.weixin.qq.com/s/WyZ4j3O68qfN5IOvjx3MOg)
+- Technique 1: Detect execution results in the transaction (such as collection amount, account balance, table record, random number calculation result, etc.), and call `eosio_assert` when the result meets certain conditions, so that the current transaction fails to rollback.
+- Technique 2: Initiate a transaction using the super-node blacklist account to trick the normal node to respond, but the transaction will not be packaged.
 
-## 参考文献
+#### [Vulnerability Sample](#vulnerability-sample-5)
+
+common modes with vulnerability:
+
+- After the gambling game is bet, the draw will be opened and transferred. A malicious contract can detect if the balance is increased by `inline_action`, thus rolling back the failed lottery
+- After the gambling game is bet, the result of the draw will be written into the form. A malicious contract can detect if the balance is increased by `inline_action`, thus rolling back the failed lottery
+- The gambling game lottery results and in-game lottery number associated. A malicious contract can initiate a number of small bet transactions and a large bet transaction at the same time, and roll back the transaction when a small amount of winning is received, thereby achieving the purpose of "transferring" the prizeable lottery number to a large bet.
+- The gambling game lottery is not associated with the betting transaction, an attacker can roll back a bet transaction with a blacklist account or a malicious contract
+
+#### [Defense Method](#defense-method-5)
+
+- Use `defer action` to transfer and send receipts
+- Establish a  dependency of reveal function, such as order dependency. And check if the record is existed on the blockchain when reveal. Even if the reveal function was excuted successful on the node server, since the record is rolled back in bp, the corresponding  record will be rolled back.
+
+#### [The Real Case](#the-real-case-5)
+- [Roll Back Attack about Blacklist in EOS](https://mp.weixin.qq.com/s/WyZ4j3O68qfN5IOvjx3MOg)
+
+## [Reference](#reference)
 
 - [保管好私钥就安全了吗？注意隐藏在EOS DAPP中的安全隐患](https://zhuanlan.zhihu.com/p/40625180)
 - [漏洞详解|恶意 EOS 合约存在吞噬用户 RAM 的安全风险](https://zhuanlan.zhihu.com/p/40469719)
@@ -318,12 +325,12 @@ EOS链上不能生成真随机数，在设计随机类应用时建议参考官�
 - [BET被黑客攻击始末，实锤还原作案现场和攻击手段](https://github.com/ganjingcun/bet-death-causes/blob/master/README.md)
 - [累计薅走数百万，EOS Dapps已成黑客提款机？](https://mp.weixin.qq.com/s/74ggygC3nbDihLkobXOW2w)
 
-## 致谢
+## [Acknowledgement](#acknowledgement)
 
-- [麒麟工作组](https://github.com/cryptokylin)
+- [CryptoKylin Workgroup](https://github.com/cryptokylin)
 - eosiofans
-- 荆凯(EOS42)
+- Kai Jing(荆凯)
 - 星魂
 - 岛娘
-- 赵余(EOSLaoMao)
+- Yu Zhao(赵余)
 - 字符
